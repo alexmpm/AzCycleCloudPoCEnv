@@ -1,0 +1,73 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {  
+        "location":{
+            "value": "westeurope"
+        },       
+        "vnet_name": {            
+            "value": "vnet-azcyclecloud-poc"
+        },      
+        "vnet_addressSpace": {
+            "value": [
+                "192.168.0.0/16" 
+            ]                    
+        },  
+        "subnet_azbast_addressRange": {
+            "value": "192.168.0.0/27"
+        },         
+        "subnet_cycle_addressRange": {
+            "value": "192.168.0.32/27"
+        },        
+        "subnet_comp_addressRange": {
+            "value": "192.168.8.0/21"
+        },
+        "bastion_name": { 
+            "value":"bast-azcyclecloud-poc"
+        },
+        "bastion_publicIP": {            
+            "value": "pubip-azcyclecloud-poc"
+        }, 
+        "nsg_snet_cycle_name": {
+            "value":"nsg-azcyclecloud-poc-snet-cycle"
+        },
+        "nsg_snet_comp_name": {
+            "value": "nsg-azcyclecloud-poc-snet-compute"
+        },
+        "nsg_snetazurebastion_name": {
+            "value": "nsg-azcyclecloud-poc-snet-azurebastion"
+        },
+        "nic_winos16_jump_name": {
+            "value": "nic-azcyclecloud-poc-win16-jmphost"
+        },       
+        "nic_cyclecloud_name": {
+            "value": "nic-azcyclecloud-poc-cyclecloud"
+        },
+        "keyvault_name": {
+            "value": "kv-azcyclecloud-poc"
+        },  
+        "vm_winos16_jump_name": {
+            "value": "vm-azcyclecloud-poc-win16-jmp"
+        },  
+        "vm_winos16_jump_size":
+        {
+            "value": "Standard_D4s_v3"
+        },                
+        "vm_cyclecloud_name": {
+            "value": "vm-azcyclecloud-poc-cyclecloud-srv"
+        },
+        "vm_cyclecloud_size": 
+        {
+            "value": "Standard_DS3_v2" 
+        },
+        "st_data_name": {
+            "value":"stdata"
+        },
+        "st_cycle_name": {
+            "value": "stazccinst"
+        },
+        "loganaliticsws_name": {
+            "value":"log-azcyclecloud-poc"
+        }        
+    }
+}
