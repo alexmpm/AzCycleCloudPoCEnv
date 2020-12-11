@@ -1,5 +1,5 @@
 param (
-    # Parameter help description
+    # Get the resouce group name
     [Parameter(Mandatory=$true)]
     [string]$rgName
 )#end param
