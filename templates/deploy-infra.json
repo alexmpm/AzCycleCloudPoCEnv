@@ -1,0 +1,748 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "type": "string"            
+        },
+        "vnet_name": {
+            "type": "string"            
+        },        
+        "vnet_addressSpace": {
+            "type": "array"
+        },       
+        "subnet_cycle_name": {
+            "type": "string",
+            "defaultValue": "snet-cycle"
+        },
+        "subnet_cycle_addressRange": {
+            "type": "string"
+        },
+        "subnet_comp_name": {
+            "type": "string",
+            "defaultValue": "snet-compute"
+        },
+        "subnet_comp_addressRange": {
+            "type": "string"
+        },            
+        "bastion_name": {
+            "type": "string"            
+        },
+        "subnet_azbast_addressRange": {
+            "type": "string"
+        },
+        "bastion_publicIP": {
+            "type": "string"            
+        },
+        "nsg_snet_cycle_name": {
+            "type": "string"           
+        },
+        "nsg_snet_comp_name": {
+            "type": "string"            
+        },
+        "nsg_snetazurebastion_name": {
+            "type": "string"            
+        },
+        "keyvault_name": {
+            "type": "string"
+        },              
+        "nic_winos16_jump_name": {
+            "type": "string"            
+        },
+        "vm_winos16_jump_name": {
+            "type": "string"
+        },
+        "vm_winos16_jump_size": {
+            "type": "string"                      
+        },
+        "vm_winos16_jump_osDiskSize": {
+            "type": "string",
+            "defaultValue": "StandardSSD_LRS"
+        },
+        "vm_winos16_computer_name": {
+            "type": "string",
+            "defaultValue": "MMLHPCJUMP01"
+        },
+        "vm_winos16_computer_adminuser": {
+            "type": "secureString",
+            "defaultValue": "superuser"
+        },             
+        "st_data_name": {
+            "type": "string"
+        },
+        "nic_cyclecloud_name": {
+            "type": "string"
+        },
+        "vm_cyclecloud_name": {
+            "type": "string"
+        },
+        "vm_cyclecloud_datadisks": {
+            "type": "array",
+            "defaultValue": [
+                {
+                    "lun": 0,
+                    "createOption": "fromImage",
+                    "caching": "ReadOnly",
+                    "writeAcceleratorEnabled": false,
+                    "id": null,
+                    "name": null,
+                    "storageAccountType": "Premium_LRS",
+                    "diskSizeGB": null,
+                    "diskEncryptionSet": null
+                }
+            ]
+        },
+        "vm_cyclecloud_size":{
+            "type": "string"
+        },
+        "vm_cyclecloud_computer_name": {
+            "type": "string",
+            "defaultValue": "MMLHPCCYCLE01"
+        },
+        "vm_cyclecloud_computer_adminuser": {
+            "type": "securestring",
+            "defaultValue": "superuser"
+        },        
+        "st_cycle_name": {
+            "type": "string"
+        },        
+        "loganaliticsws_name": {
+            "type": "string"
+        }               
+    },
+    "variables": {
+        "rg_name":"[concat('rg_azcyclecloud_poc_', uniqueString('RgName'))]",
+        "st_cycle_name": "[concat(toLower(parameters('st_cycle_name')), uniqueString(variables('rg_name')))]",
+        "st_data_name": "[concat(toLower(parameters('st_data_name')), uniqueString(variables('rg_name')))]",
+        "vm_win16_adminpass":"[concat('P!_', uniqueString(variables('rg_name')))]",
+        "vm_cyclecloud_adminpass":"[concat('P!_', uniqueString(variables('rg_name')))]"
+    },
+    "resources": [     
+        {
+            "type": "Microsoft.Resources/resourceGroups",
+            "name": "[variables('rg_name')]",            
+            "apiVersion": "2020-06-01",
+            "location": "[parameters('location')]",          
+            "properties": {
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2020-04-01",
+            "name": "[parameters('nsg_snet_cycle_name')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Resources/resourceGroups/', variables('rg_name'))]"
+            ],
+            "properties": {                
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2020-04-01",
+            "name": "[parameters('nsg_snet_comp_name')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Resources/resourceGroups/', variables('rg_name'))]"
+            ],
+            "properties": {                
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2020-04-01",
+            "name": "[parameters('nsg_snetazurebastion_name')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Resources/resourceGroups/', variables('rg_name'))]"
+            ],
+            "properties": {
+                "securityRules": [
+                    {
+                        "name":"Allow-Inbound-Https",
+                        "properties": {
+                            "description":"Allow Internet Inbound (HTTPS) to Azure Bastion",
+                            "protocol": "TCP",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "443",
+                            "sourceAddressPrefix": "Internet",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 120,
+                            "direction": "Inbound",
+                            "sourcePortRanges": [],
+                            "destinationPortRanges": [],
+                            "sourceAddressPrefixes": [],
+                            "destinationAddressPrefixes": []
+                        }
+                    },
+                    {
+                        "name":"Allow-Inbound-GatewayManagement",
+                        "properties": {
+                            "description":"Allow Gatway Manager Inboud (HTTPS) to Azure Bastion",
+                            "protocol": "TCP",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "443",
+                            "sourceAddressPrefix": "GatewayManager",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 130,
+                            "direction": "Inbound",
+                            "sourcePortRanges": [],
+                            "destinationPortRanges": [],
+                            "sourceAddressPrefixes": [],
+                            "destinationAddressPrefixes": []
+                        }
+                    },
+                    {
+                        "name": "Allow-Outbound-RDP_and_SSH",
+                        "properties": {
+                            "description":"Allow RDP and SSH outbound to VNet",
+                            "protocol": "TCP",
+                            "sourcePortRange": "*",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "VirtualNetwork",
+                            "access": "Allow",
+                            "priority": 100,
+                            "direction": "Outbound",
+                            "sourcePortRanges": [],
+                            "destinationPortRanges": [
+                                "3389",
+                                "22"
+                            ],
+                            "sourceAddressPrefixes": [],
+                            "destinationAddressPrefixes": []
+                        }
+                    },
+                    {
+                        "name": "Allow-Outbound-AzureCloud",
+                        "properties": {
+                            "description":"Allow Azure Cloud outbound (443)",
+                            "protocol": "TCP",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "443",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "AzureCloud",
+                            "access": "Allow",
+                            "priority": 110,
+                            "direction": "Outbound",
+                            "sourcePortRanges": [],
+                            "destinationPortRanges": [],
+                            "sourceAddressPrefixes": [],
+                            "destinationAddressPrefixes": []
+                        }
+                    }
+
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/VirtualNetworks",
+            "name": "[parameters('vnet_name')]",            
+            "apiVersion": "2019-09-01",
+            "location": "[parameters('location')]",
+            "tags": {},
+            "dependsOn": [
+                "[concat('Microsoft.Network/networkSecurityGroups/', parameters('nsg_snet_cycle_name'))]",
+                "[concat('Microsoft.Network/networkSecurityGroups/', parameters('nsg_snet_comp_name'))]",
+                "[concat('Microsoft.Network/networkSecurityGroups/', parameters('nsg_snetazurebastion_name'))]"
+            ],            
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": "[parameters('vnet_addressSpace')]"                                      
+                },
+                "subnets": [
+                    {
+                        "name": "[parameters('subnet_cycle_name')]",
+                        "properties": {
+                            "addressPrefix": "[parameters('subnet_cycle_addressRange')]",
+                            "networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('nsg_snet_cycle_name'))]"
+                            },
+                            "serviceEndpoints": [
+                                {
+                                    "service": "Microsoft.KeyVault",
+                                    "locations": [
+                                        "*"
+                                    ]
+                                },
+                                {
+                                    "service": "Microsoft.Storage",
+                                    "locations": [
+                                        "westeurope",
+                                        "northeurope"
+                                    ]
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "[parameters('subnet_comp_name')]",
+                        "properties": {
+                            "addressPrefix": "[parameters('subnet_comp_addressRange')]",
+                            "networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('nsg_snet_comp_name'))]"
+                            },
+                             "serviceEndpoints": [
+                                {
+                                    "service": "Microsoft.KeyVault",
+                                    "locations": [
+                                        "*"
+                                    ]
+                                },
+                                {
+                                    "service": "Microsoft.Storage",
+                                    "locations": [
+                                        "westeurope"
+                                    ]
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "AzureBastionSubnet",
+                        "properties": {
+                            "addressPrefix": "[parameters('subnet_azbast_addressRange')]",
+                             "networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('nsg_snetazurebastion_name'))]"
+                            }
+                        }
+                    }
+                ],
+                "enableDdosProtection": false                
+            }
+        },        
+        
+        {
+            "type": "Microsoft.Network/publicIpAddresses",
+            "apiVersion": "2019-02-01",
+            "name": "[parameters('bastion_publicIP')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Resources/resourceGroups/', variables('rg_name'))]"
+            ],
+            "sku": {
+                "name": "Standard"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "Static"
+            }
+        },
+        {
+            "type": "Microsoft.Network/bastionHosts",
+            "apiVersion": "2019-04-01",
+            "name": "[parameters('bastion_name')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId(variables('rg_name'), 'Microsoft.Network/virtualNetworks', parameters('vnet_name'))]",
+                "[resourceId(variables('rg_name'), 'Microsoft.Network/publicIpAddresses', parameters('bastion_publicIP'))]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "IpConf",
+                        "properties": {
+                            "subnet": {
+                                "id": "[resourceId(variables('rg_name'), 'Microsoft.Network/virtualNetworks/subnets', parameters('vnet_name'), 'AzureBastionSubnet')]"
+                            },
+                            "publicIPAddress": {
+                                "id": "[resourceId(variables('rg_name'), 'Microsoft.Network/publicIpAddresses', parameters('bastion_publicIP'))]"
+                            }
+                        }
+                    }
+                ]
+            }
+        },             
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[parameters('nic_winos16_jump_name')]",
+            "apiVersion": "2019-07-01",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/VirtualNetworks/', parameters('vnet_name'))]"
+            ], 
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnet_name'), parameters('subnet_cycle_name'))]"
+                            },
+                            "privateIPAllocationMethod": "Dynamic"
+                        }
+                    }
+                ],
+                "enableAcceleratedNetworking": true
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "name": "[parameters('vm_winos16_jump_name')]",
+            "apiVersion": "2019-07-01",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/networkInterfaces/', parameters('nic_winos16_jump_name'))]"                
+            ],
+            "properties":{
+                "hardwareProfile": {
+                    "vmSize": "[parameters('vm_winos16_jump_size')]"
+                },
+                "storageProfile": {
+                    "osDisk": {
+                        "createOption": "fromImage",
+                        "managedDisk": {
+                            "storageAccountType": "[parameters('vm_winos16_jump_osDiskSize')]"
+                        }
+                    },
+                    "imageReference": {
+                        "publisher": "MicrosoftWindowsServer",
+                        "offer": "WindowsServer",
+                        "sku": "2016-Datacenter",
+                        "version": "latest"
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', parameters('nic_winos16_jump_name'))]"
+                        }
+                    ]
+                },
+                "osProfile": {
+                    "computerName": "[parameters('vm_winos16_computer_name')]",
+                    "adminUsername": "[parameters('vm_winos16_computer_adminuser')]",
+                    "adminPassword": "[variables('vm_win16_adminpass')]",
+                    "windowsConfiguration": {
+                        "enableAutomaticUpdates": true,
+                        "provisionVmAgent": true
+                    }
+                }
+            },
+            "resources":[
+                {
+                    "type": "extensions",
+                    "name": "OMSExtension",
+                    "apiVersion": "2019-07-01",
+                    "location": "[parameters('location')]",
+                    "dependsOn": [
+                        "[concat('Microsoft.Compute/virtualMachines/', parameters('vm_winos16_jump_name'))]"
+                    ],
+                    "properties": {
+                        "publisher": "Microsoft.EnterpriseCloud.Monitoring",
+                        "type": "MicrosoftMonitoringAgent",
+                        "typeHandlerVersion": "1.0",
+                        "autoUpgradeMinorVersion": true,
+                        "settings": {
+                            "workspaceId": "[reference(resourceId(variables('rg_name') ,'Microsoft.OperationalInsights/workspaces/', parameters('loganaliticsws_name')), '2020-03-01-preview').customerId]"
+                        },
+                        "protectedSettings": {
+                            "workspaceKey": "[listKeys(resourceId(variables('rg_name'),'Microsoft.OperationalInsights/workspaces/', parameters('loganaliticsws_name')), '2020-03-01-preview').primarySharedKey]"
+                        }
+                    }
+                }
+            ]
+        },      
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[parameters('nic_cyclecloud_name')]",
+            "apiVersion": "2019-07-01",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/VirtualNetworks/', parameters('vnet_name'))]"
+            ], 
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnet_name'), parameters('subnet_cycle_name'))]"
+                            },
+                            "privateIPAllocationMethod": "Dynamic"
+                        }
+                    }
+                ],
+                "enableAcceleratedNetworking": true
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "name": "[parameters('vm_cyclecloud_name')]",
+            "apiVersion": "2019-07-01",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/networkInterfaces/', parameters('nic_cyclecloud_name'))]"
+            ],
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[parameters('vm_cyclecloud_size')]"
+                },
+                "storageProfile": {
+                    "osDisk": {
+                        "createOption": "fromImage",
+                        "managedDisk": {
+                            "storageAccountType": "Premium_LRS"
+                        }
+                    },
+                    "imageReference": {
+                        "publisher": "azurecyclecloud",
+                        "offer": "azure-cyclecloud-vm",
+                        "sku": "cyclecloud-79",
+                        "version": "latest"
+                    },
+                    "copy":[
+                        {
+                            "name": "dataDisks",
+                            "count":"[length(parameters('vm_cyclecloud_datadisks'))]",
+                            "input": {
+                                "lun": "[parameters('vm_cyclecloud_datadisks')[copyIndex('dataDisks')].lun]",
+                                "createOption": "[parameters('vm_cyclecloud_datadisks')[copyIndex('dataDisks')].createOption]",
+                                "caching": "[parameters('vm_cyclecloud_datadisks')[copyIndex('dataDisks')].caching]",
+                                "writeAcceleratorEnabled": "[parameters('vm_cyclecloud_datadisks')[copyIndex('dataDisks')].writeAcceleratorEnabled]",
+                                "diskSizeGB": "[parameters('vm_cyclecloud_datadisks')[copyIndex('dataDisks')].diskSizeGB]",
+                                "managedDisk": {
+                                    "id": "[coalesce(parameters('vm_cyclecloud_datadisks')[copyIndex('dataDisks')].id, if(equals(parameters('vm_cyclecloud_datadisks')[copyIndex('dataDisks')].name, json('null')), json('null'), resourceId('Microsoft.Compute/disks', parameters('vm_cyclecloud_datadisks')[copyIndex('dataDisks')].name)))]",
+                                    "storageAccountType": "[parameters('vm_cyclecloud_datadisks')[copyIndex('dataDisks')].storageAccountType]",
+                                    "diskEncryptionSet": "[parameters('vm_cyclecloud_datadisks')[copyIndex('dataDisks')].diskEncryptionSet]"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "networkProfile":{
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', parameters('nic_cyclecloud_name'))]"
+                        }
+                    ]
+                },
+                "osProfile": {
+                    "computerName": "[parameters('vm_cyclecloud_computer_name')]",
+                    "adminUsername": "[parameters('vm_cyclecloud_computer_adminuser')]",
+                    "adminPassword": "[variables('vm_cyclecloud_adminpass')]"
+                }                
+            },
+            "resources":[
+                {
+                    "type": "extensions",
+                    "name": "OMSExtension",
+                    "apiVersion": "2019-07-01",
+                    "location": "[parameters('location')]",
+                    "dependsOn": [
+                        "[concat('Microsoft.Compute/virtualMachines/', parameters('vm_cyclecloud_name'))]"
+                    ],
+                    "properties": {
+                        "publisher": "Microsoft.EnterpriseCloud.Monitoring",
+                        "type": "OmsAgentForLinux",
+                        "typeHandlerVersion": "1.13",
+                        "autoUpgradeMinorVersion": true,
+                        "settings": {
+                            "workspaceId": "[reference(resourceId(variables('rg_name'), 'Microsoft.OperationalInsights/workspaces/', parameters('loganaliticsws_name')), '2020-03-01-preview').customerId]"
+                        },
+                        "protectedSettings": {
+                            "workspaceKey": "[listKeys(resourceId(variables('rg_name'), 'Microsoft.OperationalInsights/workspaces/', parameters('loganaliticsws_name')), '2020-03-01-preview').primarySharedKey]"
+                        }
+                    }
+                }
+            ],
+            "plan": {
+                "name": "cyclecloud-79",
+                "publisher": "azurecyclecloud",
+                "product": "azure-cyclecloud-vm"
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[variables('st_cycle_name')]",
+            "apiVersion": "2019-06-01",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/VirtualNetworks/', parameters('vnet_name'))]"
+            ],
+            "sku": {
+                "name":"Standard_LRS"
+            },
+            "kind": "BlobStorage",
+            "properties": {
+                "accessTier": "Hot",
+                "minimumTlsVersion": "TLS1_2",
+                "supportsHttpsTrafficOnly": true,
+                "allowBlobPublicAccess": false,
+                "networkAcls": {
+                    "bypass": "AzureServices",
+                    "defaultAction": "Deny",
+                    "ipRules": [],
+                    "virtualNetworkRules": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnet_name'), parameters('subnet_cycle_name'))]"                        
+                        },
+                         {
+                            "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnet_name'), parameters('subnet_comp_name'))]"                        
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "type": "Microsoft.KeyVault/vaults",
+            "name": "[parameters('keyvault_name')]",            
+            "apiVersion": "2018-02-14",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                 "[concat('Microsoft.Network/VirtualNetworks/', parameters('vnet_name'))]"
+            ],                    
+            "properties": {
+                "tenantId": "[subscription().tenantId]",
+                "enabledForDeployment": true,
+                "enabledForDiskEncryption": true,
+                "enabledForTemplateDeployment": true,
+                "enableSoftDelete": false,
+                "sku": {
+                    "family": "A",
+                    "name": "standard"
+                },
+                "accessPolicies":[],
+                "networkAcls":{
+                    "bypass":"AzureServices",
+                    "defaultAction":"deny",
+                    "ipRules": [
+                        {
+                            "value": "160.62.7.250"
+                        }
+                    ],
+                    "virtualNetworkRules":[
+                        {
+                            "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnet_name'), parameters('subnet_cycle_name'))]"
+                        },
+                        {
+                            "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnet_name'), parameters('subnet_comp_name'))]"
+                        }
+                    ]
+                }
+            }
+        }, 
+        {
+            "type": "Microsoft.KeyVault/vaults/secrets",
+            "name": "[concat(parameters('keyvault_name'), '/vm-cycle-adminuser' )]",
+            "apiVersion": "2018-02-14",
+            "location": "[parameters('location')]",        
+            "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', parameters('keyvault_name'))]"
+            ],
+            "properties": {
+                "value": "[parameters('vm_cyclecloud_computer_adminuser')]"
+            }
+        },
+        {
+            "type": "Microsoft.KeyVault/vaults/secrets",
+            "name": "[concat(parameters('keyvault_name'), '/vm-cycle-adminpass' )]",
+            "apiVersion": "2018-02-14",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', parameters('keyvault_name'))]"
+            ],         
+            "properties": {
+                "value": "[variables('vm_cyclecloud_adminpass')]"
+            }
+        },
+        {
+            "type": "Microsoft.KeyVault/vaults/secrets",
+            "name": "[concat(parameters('keyvault_name'), '/vm-winos16jump-adminuser' )]",
+            "apiVersion": "2018-02-14",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', parameters('keyvault_name'))]"
+            ],            
+            "properties": {
+                "value": "[parameters('vm_winos16_computer_adminuser')]"
+            }
+        },
+         {
+            "type": "Microsoft.KeyVault/vaults/secrets",
+            "name": "[concat(parameters('keyvault_name'), '/vm-winos16jump-adminpass' )]",
+            "apiVersion": "2018-02-14",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', parameters('keyvault_name'))]"
+            ],             
+            "properties": {
+                "value": "[variables('vm_win16_adminpass')]"
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[variables('st_data_name')]",
+            "apiVersion": "2019-06-01",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/VirtualNetworks/', parameters('vnet_name'))]"
+            ],
+            "sku": {
+                "name":"Standard_LRS"
+            },
+            "kind": "StorageV2",
+            "properties": {
+                "accessTier": "Hot",
+                "minimumTlsVersion": "TLS1_2",
+                "supportsHttpsTrafficOnly": true,
+                "allowBlobPublicAccess": false,
+                "networkAcls": {
+                    "bypass": "AzureServices",
+                    "defaultAction": "Deny",
+                    "ipRules": [
+                        {
+                            "value": "160.62.7.250",
+                            "action": "Allow"
+                        }
+                    ],
+                    "virtualNetworkRules": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnet_name'), parameters('subnet_cycle_name'))]"                        
+                        },
+                         {
+                            "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnet_name'), parameters('subnet_comp_name'))]"                        
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "type": "Microsoft.OperationalInsights/workspaces",            
+            "name": "[parameters('loganaliticsws_name')]",
+            "apiVersion": "2020-03-01-preview",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Resources/resourceGroups/', variables('rg_name'))]"
+            ],
+            "properties": {
+                "sku": {
+                    "name": "pergb2018"
+                },
+            "retentionInDays": 90
+            }
+        }
+
+    ],
+    "outputs": {    
+        "Win16 VM admin username": {
+            "type": "string",
+            "value": "[ parameters('vm_winos16_computer_adminuser')]"
+        },
+        "Win16 VM admin pass": {
+            "type": "string",
+            "value": "[variables('vm_win16_adminpass')]"
+        }, 
+        "CycleCloud VM admin username": {
+            "type": "string",
+            "value": "[ parameters('vm_cyclecloud_computer_adminuser')]"
+        },
+        "CycleCloud VM admin pass": {
+            "type": "string",
+            "value": "[variables('vm_cyclecloud_adminpass')]"
+        }
+    }
+}
